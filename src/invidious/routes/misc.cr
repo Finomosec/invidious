@@ -8,23 +8,31 @@ module Invidious::Routes::Misc
 
     case preferences.default_home
     when "Popular"
-      env.redirect "/feed/popular"
+      env.redirect popular_or_trending
     when "Trending"
       env.redirect "/feed/trending"
     when "Subscriptions"
       if user
         env.redirect "/feed/subscriptions"
       else
-        env.redirect "/feed/popular"
+        env.redirect popular_or_trending
       end
     when "Playlists"
       if user
         env.redirect "/feed/playlists"
       else
-        env.redirect "/feed/popular"
+        env.redirect popular_or_trending
       end
     else
       templated "search_homepage", navbar_search: false
+    end
+  end
+
+  private def self.popular_or_trending : String
+    if CONFIG.popular_enabled && !Invidious::Jobs::PullPopularVideosJob::POPULAR_VIDEOS.get.empty?
+      return "/feed/popular"
+    else
+      return "/feed/trending"
     end
   end
 
