@@ -1066,10 +1066,13 @@ body:has(.download-overlay-toggle:checked) {
   gap: 0.25em 1em;
   max-height: 12em;
   overflow-y: auto;
-  margin-bottom: 1em;
   padding: 0.5em;
   border: 1px solid #a0a0a0;
   border-radius: 3px;
+}
+
+.download-overlay .download-form button[type="submit"] {
+  margin: 1em 0 0 0;
 }
 
 .download-captions-list label {
