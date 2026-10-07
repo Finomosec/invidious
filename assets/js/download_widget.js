@@ -47,11 +47,21 @@
         prefetch_checked_captions();
     });
 
+    var caption_list = overlay.querySelector('.download-captions-list');
+    var caption_labels = caption_list ? Array.prototype.slice.call(caption_list.children) : [];
+
+    function sort_checked_captions_first() {
+        caption_labels.filter(function (label) {
+            return label.querySelector('input').checked;
+        }).concat(caption_labels.filter(function (label) {
+            return !label.querySelector('input').checked;
+        })).forEach(function (label) {
+            caption_list.appendChild(label);
+        });
+    }
+
     var filter = overlay.querySelector('.download-captions-filter input');
     if (filter) {
-        var caption_list = overlay.querySelector('.download-captions-list');
-        var caption_labels = Array.prototype.slice.call(caption_list.children);
-
         var apply_filter = function () {
             var query = filter.value.trim().toLowerCase();
 
@@ -61,13 +71,7 @@
                 label.style.display = text.indexOf(query) === -1 ? 'none' : '';
             });
 
-            caption_labels.filter(function (label) {
-                return label.querySelector('input').checked;
-            }).concat(caption_labels.filter(function (label) {
-                return !label.querySelector('input').checked;
-            })).forEach(function (label) {
-                caption_list.appendChild(label);
-            });
+            sort_checked_captions_first();
         };
 
         filter.addEventListener('input', apply_filter);
@@ -151,6 +155,7 @@
                     caption.auto === checkbox.dataset.auto;
             });
         });
+        sort_checked_captions_first();
     }
 
     video_select.form.addEventListener('submit', function () {
