@@ -173,6 +173,7 @@ body a.pure-button {
 }
 
 button.pure-button-primary,
+label.pure-button-primary,
 body a.pure-button-primary,
 .channel-owner:hover,
 .channel-owner:focus {
@@ -861,6 +862,271 @@ h1, h2, h3, h4, h5, p,
 
 #download_widget {
     width: 100%;
+}
+
+.download-overlay-toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.download-overlay-toggle:focus-visible + label {
+  outline: 2px solid rgb(0, 182, 240);
+  outline-offset: 2px;
+}
+
+.download-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.download-overlay-toggle:checked ~ .download-overlay {
+  display: flex;
+}
+
+body:has(.download-overlay-toggle:checked) {
+  overflow: hidden;
+}
+
+.download-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+.download-overlay-panel {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 0 1.5em 1.5em 1.5em;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #303030;
+}
+
+.download-overlay-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding-top: 1em;
+  margin-bottom: 1em;
+  border-bottom: 1px solid #a0a0a0;
+  background-color: inherit;
+}
+
+.download-tab-toggle {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.download-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+}
+
+.download-tabs label {
+  padding: 0.5em 1em;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.6;
+}
+
+#download-tab-merged:checked ~ .download-overlay-header label[for="download-tab-merged"],
+#download-tab-raw:checked ~ .download-overlay-header label[for="download-tab-raw"] {
+  border-bottom-color: rgb(0, 182, 240);
+  opacity: 1;
+}
+
+.download-tab-toggle:focus-visible ~ .download-overlay-header .download-tabs {
+  outline: 2px solid rgb(0, 182, 240);
+}
+
+.download-tab {
+  display: none;
+}
+
+#download-tab-merged:checked ~ .download-tab-merged,
+#download-tab-raw:checked ~ .download-tab-raw {
+  display: block;
+}
+
+.download-overlay-close {
+  font-size: 2em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.download-overlay fieldset {
+  min-width: 0;
+}
+
+.download-overlay legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.download-overlay select {
+  width: 100%;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+.download-tab-merged .pure-control-group + .pure-control-group,
+.download-tab-merged .pure-control-group + .download-captions {
+  margin-top: 1em;
+}
+
+.download-overlay .download-captions {
+  padding: 0;
+}
+
+.download-overlay .download-captions legend {
+  margin: 0 0 0.25em 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+.download-captions-filter:not([hidden]) {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.download-captions-filter > span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.download-overlay .download-captions-filter input {
+  width: 10em;
+  padding: 0.2em 1.8em 0.2em 0.5em;
+  font-size: 0.85em;
+}
+
+.download-captions-filter input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.download-captions-filter button {
+  position: absolute;
+  right: 0.3em;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #303030;
+  font-size: 1.2em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.download-captions-filter input:placeholder-shown + button {
+  display: none;
+}
+
+.download-captions-select button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.download-captions-select button:hover,
+.download-captions-select button:focus-visible {
+  text-decoration: underline;
+}
+
+.download-captions-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14em, 1fr));
+  gap: 0.25em 1em;
+  max-height: 12em;
+  overflow-y: auto;
+  margin-bottom: 1em;
+  padding: 0.5em;
+  border: 1px solid #a0a0a0;
+  border-radius: 3px;
+}
+
+.download-captions-list label {
+  justify-self: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.download-captions-list label,
+.download-captions-select,
+.download-tabs label {
+  user-select: none;
+}
+
+.download-captions-list input {
+  cursor: pointer;
+}
+
+.download-captions-badge {
+  display: inline-block;
+  padding: 0 0.4em;
+  border-radius: 3px;
+  background-color: #a0a0a0;
+  color: #fff;
+  font-size: 0.75em;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.dark-theme .download-overlay-panel {
+  background-color: rgba(35, 35, 35, 1);
+  color: #f0f0f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .no-theme .download-overlay-panel {
+    background-color: rgba(35, 35, 35, 1);
+    color: #f0f0f0;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .download-overlay {
+    padding: 0;
+  }
+
+  .download-overlay-panel {
+    max-width: none;
+    height: 100%;
+    border-radius: 0;
+    padding: 0 16px 16px 16px;
+  }
+
+  .download-overlay .pure-button {
+    width: 100%;
+  }
 }
 
 .error-card {

@@ -329,4 +329,206 @@ module Invidious::Routes::Watch
       return error_template(400, "Invalid label or itag")
     end
   end
+
+  def self.download_merged(env)
+    if CONFIG.disabled?("downloads")
+      return error_template(403, "Administrator has disabled this endpoint.")
+    end
+    if !Invidious::Videos::MergedDownload.available?
+      return error_template(403, "Merged downloads are not available on this instance.")
+    end
+
+    video_id = env.params.body["id"]? || ""
+    video_itag = env.params.body["video_itag"]?.try &.to_i?
+    audio_itag = env.params.body["audio_itag"]?.try &.to_i?
+    caption_labels = env.params.body.fetch_all("caption")
+
+    if !validate_video_id(video_id)
+      return error_template(400, InvalidVideoID.new(video_id))
+    end
+    if video_itag.nil? || audio_itag.nil?
+      return error_template(400, "Missing form data")
+    end
+    if CONFIG.dmca_content.includes?(video_id)
+      return error_template(403, "dmca_content")
+    end
+
+    begin
+      video = get_video(video_id)
+    rescue ex : NotFoundException
+      return error_template(404, ex)
+    rescue ex
+      return error_template(500, ex)
+    end
+
+    video_fmt = video.video_streams.find(&.["itag"].as_i.== video_itag)
+    audio_fmt = video.audio_streams.find do |fmt|
+      fmt["itag"].as_i == audio_itag && Invidious::Videos::MergedDownload.mergeable_audio?(fmt)
+    end
+
+    if video_fmt.nil? || audio_fmt.nil?
+      return error_template(400, "Invalid itag")
+    end
+
+    companion = CONFIG.invidious_companion.sample
+
+    subtitles = video.captions.select { |caption| caption_labels.includes?(caption.name) }.map do |caption|
+      Invidious::Videos::MergedDownload::Subtitle.new(
+        url: Invidious::Videos::MergedDownload.subtitle_url(companion, video_id, caption.name),
+        language_code: caption.language_code,
+        name: caption.name,
+        auto_generated: caption.auto_generated
+      )
+    end
+    subtitles = Invidious::Videos::MergedDownload.sort_subtitles(
+      subtitles,
+      env.get("preferences").as(Preferences).captions,
+      Invidious::Videos::MergedDownload.audio_language(audio_fmt)
+    )
+
+    container = Invidious::Videos::MergedDownload.container_for(
+      video_fmt["mimeType"].as_s, audio_fmt["mimeType"].as_s
+    )
+
+    filename = URI.encode_www_form("#{video.title}-#{video_id}.#{container.extension}", space_to_plus: false)
+
+    merge_arguments = ->(output : String, merged_subtitles : Array(Invidious::Videos::MergedDownload::Subtitle)) do
+      Invidious::Videos::MergedDownload.ffmpeg_arguments(
+        container: container,
+        video_url: Invidious::Videos::MergedDownload.stream_url(companion, video_id, video_itag),
+        audio_url: Invidious::Videos::MergedDownload.stream_url(companion, video_id, audio_itag),
+        audio_language: Invidious::Videos::MergedDownload.audio_language(audio_fmt),
+        title: video.title,
+        output: output,
+        subtitles: merged_subtitles,
+        request_size: Invidious::Videos::MergedDownload.request_size_supported?
+      )
+    end
+
+    if subtitles.empty?
+      return stream_merged(env, merge_arguments.call("pipe:1", subtitles), container, filename, video_id)
+    end
+
+    directory = File.tempname("invidious-download")
+    Dir.mkdir(directory)
+
+    begin
+      fetched_subtitles = ::Channel(Array(Invidious::Videos::MergedDownload::Subtitle)).new(1)
+      spawn do
+        fetched_subtitles.send(Invidious::Videos::MergedDownload.fetch_subtitles(video_id, subtitles, directory))
+      rescue ex
+        LOGGER.warn("download_merged: failed to fetch the subtitles of #{video_id}: #{ex.message}")
+        fetched_subtitles.send([] of Invidious::Videos::MergedDownload::Subtitle)
+      end
+
+      # Subtitles that are prefetched or few are ready right away, so the
+      # download can be streamed. Otherwise, the streams are merged into a
+      # file while the subtitles are fetched, as the subtitles must be known
+      # before the output can start.
+      select
+      when ready_subtitles = fetched_subtitles.receive
+        return stream_merged(env, merge_arguments.call("pipe:1", ready_subtitles), container, filename, video_id)
+      when timeout(SUBTITLE_WAIT)
+      end
+
+      merged_path = File.join(directory, "merged.#{container.extension}")
+      status, errors = run_ffmpeg(merge_arguments.call(merged_path, [] of Invidious::Videos::MergedDownload::Subtitle))
+      subtitles = fetched_subtitles.receive
+
+      if status.success? && !subtitles.empty?
+        output_path = File.join(directory, "output.#{container.extension}")
+        status, errors = run_ffmpeg(Invidious::Videos::MergedDownload.subtitle_arguments(container, merged_path, subtitles, output_path))
+      else
+        output_path = merged_path
+      end
+
+      if !status.success?
+        LOGGER.warn("download_merged: ffmpeg failed for #{video_id} (#{status}): #{errors}")
+        return error_template(500, "Failed to merge the streams of the video.")
+      end
+
+      env.response.content_type = container.mime_type
+      env.response.headers["Content-Disposition"] = "attachment; filename=\"#{filename}\"; filename*=UTF-8''#{filename}"
+      env.response.content_length = File.size(output_path)
+
+      begin
+        File.open(output_path) { |file| IO.copy(file, env.response) }
+      rescue IO::Error | HTTP::Server::ClientError
+        # The client closed the connection
+      end
+    ensure
+      FileUtils.rm_rf(directory)
+    end
+  end
+
+  private SUBTITLE_WAIT = 3.seconds
+
+  def self.prefetch_subtitle(env)
+    video_id = env.params.body["id"]? || ""
+    label = env.params.body["caption"]? || ""
+
+    if !Invidious::Videos::MergedDownload.available? || !validate_video_id(video_id)
+      haltf env, status_code: 400
+    end
+
+    begin
+      video = get_video(video_id)
+    rescue
+      haltf env, status_code: 404
+    end
+
+    if !video.captions.any?(&.name.== label)
+      haltf env, status_code: 404
+    end
+
+    companion = CONFIG.invidious_companion.sample
+    url = Invidious::Videos::MergedDownload.subtitle_url(companion, video_id, label)
+    Invidious::Videos::MergedDownload::SubtitleCache.prefetch(video_id, label, url)
+
+    haltf env, status_code: 204
+  end
+
+  private def self.run_ffmpeg(arguments : Array(String)) : {Process::Status, String}
+    errors = IO::Memory.new
+    status = Process.run(Invidious::Videos::MergedDownload.ffmpeg_path.not_nil!, arguments, error: errors)
+    return status, errors.to_s.strip
+  end
+
+  private def self.stream_merged(env, arguments : Array(String), container, filename : String, video_id : String)
+    ffmpeg = Process.new(
+      Invidious::Videos::MergedDownload.ffmpeg_path.not_nil!, arguments,
+      input: Process::Redirect::Close,
+      output: Process::Redirect::Pipe,
+      error: Process::Redirect::Pipe
+    )
+
+    # ffmpeg blocks once the stderr pipe is full
+    ffmpeg_errors = IO::Memory.new
+    spawn { IO.copy(ffmpeg.error, ffmpeg_errors) rescue nil }
+
+    env.response.content_type = container.mime_type
+    env.response.headers["Content-Disposition"] = "attachment; filename=\"#{filename}\"; filename*=UTF-8''#{filename}"
+
+    bytes_written = 0_i64
+    client_disconnected = false
+    begin
+      bytes_written = IO.copy(ffmpeg.output, env.response)
+    rescue IO::Error | HTTP::Server::ClientError
+      client_disconnected = true
+    ensure
+      ffmpeg.terminate if !ffmpeg.terminated?
+    end
+
+    status = ffmpeg.wait
+
+    if !status.success? && !client_disconnected
+      LOGGER.warn("download_merged: ffmpeg failed for #{video_id} (#{status}): #{ffmpeg_errors.to_s.strip}")
+
+      # Headers not sent yet
+      if bytes_written == 0
+        env.response.headers.delete("Content-Disposition")
+        return error_template(500, "Failed to merge the streams of the video.")
+      end
+    end
+  end
 end

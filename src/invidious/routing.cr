@@ -170,6 +170,8 @@ module Invidious::Routing
     get "/e/:id", Routes::Watch, :redirect
 
     post "/download", Routes::Watch, :download
+    post "/download/merged", Routes::Watch, :download_merged
+    post "/download/merged/subtitle", Routes::Watch, :prefetch_subtitle
 
     get "/embed/", Routes::Embed, :redirect
     get "/embed/:id", Routes::Embed, :show

@@ -219,6 +219,18 @@ https_only: false
 #disable_proxy: false
 
 ##
+## Path to the ffmpeg executable, used to download a video stream,
+## an audio stream and subtitles merged into a single file.
+## ffmpeg fetches them from the private URL of Invidious companion.
+##
+## If ffmpeg can't be found, only single streams can be downloaded.
+##
+## Accepted values: a path or the name of an executable in PATH
+## Default: ffmpeg
+##
+#ffmpeg_path: ffmpeg
+
+##
 ## Size of the HTTP pool used to connect to youtube. Each
 ## domain ('youtube.com', 'ytimg.com', ...) has its own pool.
 ##

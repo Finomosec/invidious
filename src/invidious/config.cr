@@ -151,6 +151,8 @@ class Config
   property hsts : Bool? = true
   # Disable proxying server-wide: options: 'dash', 'livestreams', 'downloads', 'local'
   property disable_proxy : Bool? | Array(String)? = false
+  # Merges the streams of downloads
+  property ffmpeg_path : String = "ffmpeg"
   # Enable the user notifications for all users
   property enable_user_notifications : Bool = true
 

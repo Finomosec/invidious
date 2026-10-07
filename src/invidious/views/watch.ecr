@@ -203,6 +203,7 @@ we're going to need to do it here in order to allow for translations.
             <% end %>
 
             <%= Invidious::Frontend::WatchPage.download_widget(locale, video, video_assets) %>
+            <script src="/js/download_widget.js?v=<%= ASSET_COMMIT %>"></script>
 
             <p id="views"><i class="icon ion-ios-eye"></i> <%= number_with_separator(video.views) %></p>
             <p id="likes"><i class="icon ion-ios-thumbs-up"></i> <%= number_with_separator(video.likes) %></p>
