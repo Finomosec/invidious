@@ -74,7 +74,7 @@ RUN --mount=type=cache,target=/root/.cache/crystal if [[ "${release}" == 1 ]] ; 
     fi
 
 FROM alpine:3.24
-RUN apk add --no-cache rsvg-convert ttf-opensans tini tzdata
+RUN apk add --no-cache rsvg-convert ttf-opensans tini tzdata ffmpeg
 WORKDIR /invidious
 RUN addgroup -g 1000 -S invidious && \
     adduser -u 1000 -S invidious -G invidious
